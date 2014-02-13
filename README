@@ -7,12 +7,13 @@ To use it, you would do something like:
  * get some build dependencies:
    $ sudo apt-get -y install bison flex texinfo build-essential gettext ncurses-dev unzip bzr qemu-kvm cvs quilt
 
- * git clone -b manila-service-generic https://github.com/csabahenk/cirros
- * cd cirros
+ * get Cirros
+   $ git clone -b manila-service-generic https://github.com/csabahenk/cirros
+   $ cd cirros
 
  * download buildroot and setup environment
-   git submodule init
-   git submodule update
+   $ git submodule init
+   $ git submodule update
 
  * update ./bin/mkcabundle > src/etc/ssl/certs/ca-certificates.crt
    $ ./bin/mkcabundle > src/etc/ssl/certs/ca-certificates.crt
@@ -55,3 +56,40 @@ To use it, you would do something like:
    $ kvm -drive file=disk.img,if=virtio -curses
    $ kvm file=blank.img,if=virtio -curses \
       -kernel kernel -initrd initrd -drive -append "debug-initrd"
+
+To make changes in buildroot configuration:
+
+ * Have an up-to-date buildroot checkout
+
+ * Copy the conf file corresponding to your architecture
+   to buildroot tree
+   $ cp conf/buildroot-x86_64.config buildroot/.config
+
+ * Perform config changes
+   $ make -C buildroot menuconfig
+
+ * Copy back the config file to Cirros project space
+   to preserve it for further builds
+   $ cp buildroot/.config conf/buildroot-x86_64.config
+
+ * Commit to git
+   $ git commit -a
+
+To update buildroot or switch to another version:
+
+ * Do the update and let git know of it
+
+   $ cd buildroot
+   $ git pull
+     or
+   $ git checkout <ref>
+   $ cd ..
+   $ git add buildroot
+
+ * Update config
+   $ cp conf/buildroot-x86_64.config buildroot/.config &&
+     make -C buildroot olddefconfig &&
+     cp buildroot/.config conf/buildroot-x86_64.config
+
+ * Commit to git
+   $ git commit -a
