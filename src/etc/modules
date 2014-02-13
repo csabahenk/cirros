@@ -1,11 +1,16 @@
 # modules here are loaded one per line
 acpiphp
-e1000
-ne2k-pci
-8139cp
-pcnet32
+#e1000
+#ne2k-pci
+#8139cp
+#pcnet32
 ip_tables
-isofs
-vfat
+#isofs
+#vfat
 nls_cp437
 nls_iso8859-1
+nfs
+nfsv2
+nfsv3
+nfsv4
+cifs

@@ -1,0 +1,13 @@
+diff --git a/package/nfs-utils/nfs-utils.mk b/package/nfs-utils/nfs-utils.mk
+index 76face5..abbecbb 100644
+--- a/package/nfs-utils/nfs-utils.mk
++++ b/package/nfs-utils/nfs-utils.mk
+@@ -13,8 +13,6 @@ NFS_UTILS_DEPENDENCIES = host-pkgconf
+ NFS_UTILS_CONF_ENV = knfsd_cv_bsd_signals=no
+ 
+ NFS_UTILS_CONF_OPT = \
+-		--disable-nfsv4 \
+-		--disable-nfsv41 \
+ 		--disable-gss \
+ 		--disable-uuid \
+ 		--disable-ipv6 \
