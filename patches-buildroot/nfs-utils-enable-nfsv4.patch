@@ -1,8 +1,52 @@
+diff --git a/package/Config.in b/package/Config.in
+index fca61d6..44c22c0 100644
+--- a/package/Config.in
++++ b/package/Config.in
+@@ -675,6 +675,7 @@ source "package/libnetfilter_cttimeout/Config.in"
+ source "package/libnetfilter_log/Config.in"
+ source "package/libnetfilter_queue/Config.in"
+ source "package/libnfnetlink/Config.in"
++source "package/libnfsidmap/Config.in"
+ source "package/libnftnl/Config.in"
+ source "package/libnl/Config.in"
+ source "package/liboauth/Config.in"
+diff --git a/package/libnfsidmap/Config.in b/package/libnfsidmap/Config.in
+new file mode 100644
+index 0000000..2957a40
+--- /dev/null
++++ b/package/libnfsidmap/Config.in
+@@ -0,0 +1,6 @@
++config BR2_PACKAGE_LIBNFSIDMAP
++	bool "libnfsidmap"
++	help
++	  libnfsidmap is a helper lib for NFSv4 to map IDs
++
++	  http://www.citi.umich.edu/projects/nfsv4/linux/libnfsidmap
+diff --git a/package/libnfsidmap/libnfsidmap.mk b/package/libnfsidmap/libnfsidmap.mk
+new file mode 100644
+index 0000000..58fa426
+--- /dev/null
++++ b/package/libnfsidmap/libnfsidmap.mk
+@@ -0,0 +1,14 @@
++################################################################################
++#
++# libnfsidmap
++#
++################################################################################
++
++LIBNFSIDMAP_VERSION = 0.25
++LIBNFSIDMAP_SITE = http://www.citi.umich.edu/projects/nfsv4/linux/libnfsidmap
++LIBNFSIDMAP_SOURCE = libnfsidmap-$(LIBNFSIDMAP_VERSION).tar.gz
++LIBNFSIDMAP_INSTALL_STAGING = YES
++LIBNFSIDMAP_LICENSE = BSD-like
++LIBNFSIDMAP_LICENSE_FILES = COPYING
++
++$(eval $(autotools-package))
 diff --git a/package/nfs-utils/nfs-utils.mk b/package/nfs-utils/nfs-utils.mk
-index 76face5..abbecbb 100644
+index 76face5..e7fb408 100644
 --- a/package/nfs-utils/nfs-utils.mk
 +++ b/package/nfs-utils/nfs-utils.mk
-@@ -13,8 +13,6 @@ NFS_UTILS_DEPENDENCIES = host-pkgconf
+@@ -13,14 +13,19 @@ NFS_UTILS_DEPENDENCIES = host-pkgconf
  NFS_UTILS_CONF_ENV = knfsd_cv_bsd_signals=no
  
  NFS_UTILS_CONF_OPT = \
@@ -11,3 +55,16 @@ index 76face5..abbecbb 100644
  		--disable-gss \
  		--disable-uuid \
  		--disable-ipv6 \
+ 		--without-tcp-wrappers \
+ 		--with-rpcgen=internal
+ 
++ifeq ($(BR2_PACKAGE_LIBNFSIDMAP),y)
++NFS_UTILS_DEPENDENCIES += libnfsidmap lvm2
++NFS_UTILS_CONF_OPT += --enable-nfsv4 --enable-nfsv41
++else
++NFS_UTILS_CONF_OPT += --disable-nfsv4 --disable-nfsv41
++endif
++
+ NFS_UTILS_TARGETS_$(BR2_PACKAGE_NFS_UTILS_RPCDEBUG) += usr/sbin/rpcdebug
+ NFS_UTILS_TARGETS_$(BR2_PACKAGE_NFS_UTILS_RPC_LOCKD) += usr/sbin/rpc.lockd
+ NFS_UTILS_TARGETS_$(BR2_PACKAGE_NFS_UTILS_RPC_RQUOTAD) += usr/sbin/rpc.rquotad
