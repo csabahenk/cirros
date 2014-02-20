@@ -4,7 +4,7 @@
 
 TEMP_D=""
 UMOUNT=""
-DEF_SIZE=24M
+DEF_XSIZE=80
 DEBUG=0
 DEF_MODULES="acpiphp e1000 ne2k-pci 8139cp pcnet32 ip_tables"
 
@@ -21,7 +21,7 @@ Usage: ${0##*/} rootfs.tar kpkg.deb output_dir
    [re]Bundle a buildroot rootfs into a mini-cloud image
 
    options:
-     -s | --size S            resize image to size (default: ${DEF_SIZE})
+     -x | --xsize S           extra size of image compared to rootfs in Mb (default: ${DEF_XSIZE})
 
    Example:
     ${0##*/} rootfs.tar linux-image-*-virtuaal*.deb build-output/
@@ -36,15 +36,15 @@ xrsync() {
 	rsync --archive --xattrs --hard-links --acls --sparse "$@"
 }
 
-short_opts="hs:v"
-long_opts="initrd-busybox:,help,size:,verbose"
+short_opts="hx:v"
+long_opts="initrd-busybox:,help,xsize:,verbose"
 getopt_out=$(getopt --name "${0##*/}" \
 	--options "${short_opts}" --long "${long_opts}" -- "$@") &&
 	eval set -- "${getopt_out}" ||
 	bad_Usage
 
 topdir=$(cd "${0%/*}/.." && pwd)
-size=${DEF_SIZE}
+xsize=${DEF_XSIZE}
 FS_LABEL="cirros-rootfs"
 fs_type="ext3"
 
@@ -52,7 +52,7 @@ while [ $# -ne 0 ]; do
 	cur=${1}; next=${2};
 	case "$cur" in
 		-h|--help) Usage; exit 0;;
-		-s|--size) size=${next}; shift;;
+		-x|--xsize) xsize=${next}; shift;;
 		-v|--verbose) DEBUG=$((${DEBUG}+1));;
 		--) shift; break;;
 	esac
@@ -124,6 +124,7 @@ mkdir -p "${mp}" "${kernel_d}" "${overlay_d}" \
 
 debug 1 "creating filesystem in ${out_partimg}"
 rm -f "$out_partimg"
+size=$((`stat -c '%s' "$filesys_tar"` + $xsize*(1<<20)))
 truncate "--size=${size}" "${out_partimg}" ||
 	fail "failed to create ${out_partimg} of size ${size}"
 
