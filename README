@@ -38,16 +38,12 @@ To use it, you would do something like:
    The kernel input to bundle must be in deb format. The ubuntu '-virtual'
    kernel is used as a starting point.
 
-   $ kver="3.2.0-57.87";
-   $ burl="https://launchpad.net/ubuntu/+archive/primary/+files/linux-image"
-   $ for arch in i386 x86_64 arm; do
-     xarch=$arch; flav="virtual"
-     [ "$arch" = "x86_64" ] && xarch="amd64";
-     [ "$arch" = "arm" ] && xarch="armel" && flav="omap"
-     url="$burl-${kver%.*}-${flav}_${kver}_${xarch}.deb"
-     wget "$url" -O download/${url##*/}
-     ln -sf ${url##*/} download/kernel-${arch}.deb
-   done
+   For example, to get the Ubuntu Saucy kernel for x86_64:
+
+   # Following links to find deb archive from
+   # https://launchpad.net/ubuntu/saucy/+package/linux-image
+   $ (cd download &&
+      wget http://launchpadlibrarian.net/164735055/linux-image-3.11.0-17-generic_3.11.0-17.31_amd64.deb)
 
  * build disk images using bin/bundle
    $ sudo ./bin/bundle -v output/$ARCH/rootfs.tar download/kernel-$ARCH.deb output/$ARCH/images

@@ -1,9 +1,9 @@
 #!/bin/bash
 # vi: ts=4 noexpandtab
 
-# these urls are for lucid release version of grub
-i386_url="https://launchpad.net/ubuntu/+archive/primary/+files/grub_0.97-29ubuntu60_i386.deb"
-x86_64_url="https://launchpad.net/ubuntu/+archive/primary/+files/grub_0.97-29ubuntu60_amd64.deb"
+# these urls are for saucy release version of grub -- sorry, no nice URL I know of!
+i386_url="http://launchpadlibrarian.net/97045042/grub_0.97-29ubuntu66_i386.deb"
+x86_64_url="http://launchpadlibrarian.net/97044932/grub_0.97-29ubuntu66_amd64.deb"
 TEMP_D=""
 
 Usage() {
