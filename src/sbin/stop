@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# ubuntu compat thingy
+
+killall -q "$1" || echo stop: Unknown instance:
