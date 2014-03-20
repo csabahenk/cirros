@@ -1,0 +1,17 @@
+diff --git a/package/dropbear/dropbear.mk b/package/dropbear/dropbear.mk
+index 3ef6c8d..91df23c 100644
+--- a/package/dropbear/dropbear.mk
++++ b/package/dropbear/dropbear.mk
+@@ -22,7 +22,12 @@ define DROPBEAR_FIX_XAUTH
+ 	$(SED) 's,^#define XAUTH_COMMAND.*/xauth,#define XAUTH_COMMAND "/usr/bin/xauth,g' $(@D)/options.h
+ endef
+ 
++define DROPBEAR_FIX_PATH
++	$(SED) 's,^#define DEFAULT_PATH .*,#define DEFAULT_PATH "/usr/bin:/bin:/usr/sbin:/sbin",' $(@D)/options.h
++endef
++
+ DROPBEAR_POST_EXTRACT_HOOKS += DROPBEAR_FIX_XAUTH
++DROPBEAR_POST_EXTRACT_HOOKS += DROPBEAR_FIX_PATH
+ 
+ define DROPBEAR_ENABLE_REVERSE_DNS
+ 	$(SED) 's:.*\(#define DO_HOST_LOOKUP\).*:\1:' $(@D)/options.h
