@@ -3,6 +3,6 @@
 # ubuntu compat thingy
 
 if ! killall -q "$1"; then
-  echo stop: Unknown instance:
+  echo stop: Unknown instance: >&2
   exit 1
 fi
