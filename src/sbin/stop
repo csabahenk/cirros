@@ -2,4 +2,7 @@
 
 # ubuntu compat thingy
 
-killall -q "$1" || echo stop: Unknown instance:
+if ! killall -q "$1"; then
+  echo stop: Unknown instance:
+  exit 1
+fi
