@@ -1,7 +1,7 @@
 # vi: ts=4 noexpandtab syntax=sh
 
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-
+umask 022
 ENV=$HOME/.shrc; export ENV
 
 # If running interactively, then:
