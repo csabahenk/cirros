@@ -60,13 +60,14 @@ diff --git a/package/nfs-utils/S60nfs b/package/nfs-utils/S60nfs
 index 49dab70..3297de9 100755
 --- a/package/nfs-utils/S60nfs
 +++ b/package/nfs-utils/S60nfs
-@@ -23,9 +23,17 @@ touch /var/lib/nfs/xtab
+@@ -23,9 +23,18 @@ touch /var/lib/nfs/xtab
  
  start() {
  	# Start daemons.
 +	echo -n "Starting NFS idmapd: "
 +	pipefs_dir="`sed -n 's/^ *Pipefs-Directory *= *//p' /etc/idmapd.conf`"
-+	if ! [ mount | grep -q "on $pipefs_dir type rpc_pipefs" ]; then
++	mount | grep -q "on $pipefs_dir type rpc_pipefs"
++	if ! [ $? -eq 0 ]; then
 +		mkdir -p "$pipefs_dir"
 +		mount -t rpc_pipefs sunrpc "$pipefs_dir"
 +	fi
