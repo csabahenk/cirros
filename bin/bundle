@@ -236,6 +236,12 @@ rm -Rf "$initramfs_d/vmlinuz" "$initramfs_d/boot" ||
 rm -Rf "$initramfs_d/lib/modules/$kver" ||
 	fail "failed to remove lib/modules for mini initramfs"
 
+# XXX depdetect failures are swallowed as pipe's last component
+# provides the return value
+( cd "$initramfs_d" && depdetect -s bin-unused -I init | xargs rm
+  exit ${PIPESTATUS[0]} ) ||
+    fail "failed to remove depdetect suggested files in initramfs staging dir"
+
 ( cd "$initramfs_d" && find . | cpio --quiet -o -H newc |
 	gzip -9 ) > "${initramfs}.smaller"
 

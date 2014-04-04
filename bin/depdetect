@@ -1,0 +1,267 @@
+#!/usr/bin/env ruby
+
+require 'set'
+require 'tempfile'
+require 'pathname'
+
+# https://github.com/grosser/parallel/blob/24566aea5/lib/parallel.rb#L122
+NCPU = begin
+        os_name = RbConfig::CONFIG["target_os"]
+        if os_name =~ /mingw|mswin/
+          require 'win32ole'
+          result = WIN32OLE.connect("winmgmts://").ExecQuery(
+              "select NumberOfLogicalProcessors from Win32_Processor")
+          result.to_enum.collect(&:NumberOfLogicalProcessors).reduce(:+)
+        elsif File.readable?("/proc/cpuinfo")
+          IO.read("/proc/cpuinfo").scan(/^processor/).size
+        elsif File.executable?("/usr/bin/hwprefs")
+          IO.popen("/usr/bin/hwprefs thread_count").read.to_i
+        elsif File.executable?("/usr/sbin/psrinfo")
+          IO.popen("/usr/sbin/psrinfo").read.scan(/^.*on-*line/).size
+        elsif File.executable?("/usr/sbin/ioscan")
+          IO.popen("/usr/sbin/ioscan -kC processor") do |out|
+            out.read.scan(/^.*processor/).size
+          end
+        elsif File.executable?("/usr/sbin/pmcycles")
+          IO.popen("/usr/sbin/pmcycles -m").read.count("\n")
+        elsif File.executable?("/usr/sbin/lsdev")
+          IO.popen("/usr/sbin/lsdev -Cc processor -S 1").read.count("\n")
+        elsif File.executable?("/usr/sbin/sysconf") and os_name =~ /irix/i
+          IO.popen("/usr/sbin/sysconf NPROC_ONLN").read.to_i
+        elsif File.executable?("/usr/sbin/sysctl")
+          IO.popen("/usr/sbin/sysctl -n hw.ncpu").read.to_i
+        elsif File.executable?("/sbin/sysctl")
+          IO.popen("/sbin/sysctl -n hw.ncpu").read.to_i
+        else
+          $stderr.puts "Unknown platform: " + RbConfig::CONFIG["target_os"]
+          $stderr.puts "Assuming 1 processor."
+          1
+        end
+      end
+
+####
+
+# Symlink-resolve +lnk+ with +root+
+# taken as root (ie. '..' path compontents
+# don't step up from +root+).
+#
+# Resolution is carried out by iterating readlink(2)
+# on the actual relavite path (starting from +lnk+)
+# and interpreting it according above semantics;
+# the iteration stops when the actual path does not
+# specify a symlink under +root+.
+def resolve_in_root lnk, root='.'
+  lp = Pathname.new lnk
+  lp.absolute? and raise "#{lnk} should be relative"
+  rp = Pathname.new root
+  rp = rp.relative_path_from Pathname.pwd if rp.absolute?
+  lpr = rp.join lp
+  lp = lpr.relative_path_from rp # normalization
+  lps = Set.new([lp]) # for loop detection
+  while lpr.symlink?
+    lt = lpr.readlink
+    if lt.absolute?
+      lp = Pathname.new('.').join lt
+      lpr = rp.join lt
+    else
+      ls = lp.dirname.to_s.split(%r@/+@)
+      # decompose link target and drop dotdots that
+      # would take out of root
+      d = ls == ['.'] ? 0 : ls.size
+      ltsx = []
+      lt.to_s.split(%r@/+@).each { |c|
+        d += case c
+        when '.'
+          0
+        when '..'
+          -1
+        else
+          1
+        end
+        d < 0 ? d = 0 : ltsx << c
+      }
+      lp = lpr.dirname.join(Pathname.new(ltsx.join "/")).relative_path_from rp
+      lpr = rp.join lp
+      break if lps.include? lp # loop detection
+      lps << lp
+    end
+  end
+  lp.to_s
+end
+
+# Try to find out which files of
+# the file tree under +root+ do
+# members of +initlist+ depend on.
+# (A heuristics is used which works
+# the best if +initlist+ consists
+# of shell scripts.)
+def get_stats root, initlist, opts={}
+  raise "initial fileset is empty" if initlist.empty?
+
+  Dir.chdir root
+
+  txt, bin, lnk = Set.new, Set.new, Set.new
+  open("|find . -type f -o -type l | xargs file") { |f|
+    f.each { |l|
+      n,t = l.split(/:\s*/, 2)
+      case t
+      when /ELF/
+        bin
+      when /symbolic link/
+        lnk
+      else
+        txt
+      end << n
+    }
+  }
+
+  files = txt + bin + lnk
+  ih = {}
+  initlist.each { |i|
+    ih[i =~ /\A\.\\/ ? i : File.join(".", i)] = nil
+  }
+  used = [{init: ih}]
+  lastused = proc do
+    used.last.values.map(&:keys).flatten
+  end
+  aggr = Set.new lastused[]
+
+  loop {
+    # grepping for dependencies
+    gu = {}
+    fset = opts[:txt_grep] ? (txt & lastused[]) : (Set.new(lastused[]) - lnk)
+    unless fset.empty?
+      w = {}
+      # grep is done in parallell, pull is
+      # the proc that reaps the results
+      pull = proc do
+        pid,s = nil
+        loop {
+          pid,s = Process.wait2 -1, Process::WNOHANG
+          break if pid
+          r,_,_ = IO.select(w.values.transpose[0], [], [], 0.5)
+          (r||[]).each { |h|
+            w[h.pid].last << (h.read(1024) || "")
+          }
+        }
+        h,f,o = w.delete pid
+        gu[f] = (o + h.read).split("\n") if s.success?
+        h.close
+      end
+      # starting the grep workers
+      (files - aggr).each { |f|
+        pull[] while w.size >= NCPU
+        h = IO.popen([%w[grep -lF], File.basename(f), fset.to_a].flatten)
+        w[h.pid] = [h,f,""]
+      }
+      pull[] until w.empty?
+    end
+
+    # dependencies by dynamic linking
+    du = {}
+    (bin & lastused[]).each { |f|
+      fx,t = f,nil
+      begin
+        if File.stat(f).setuid?
+          # uClibc ldd(1) doesn't work well with setuid binaries
+          t = Tempfile.new "exe", "tmp"
+          fx = t.path
+          t << IO.read(f)
+          t.close
+        end
+        b = IO.popen(%w[sudo chroot . ldd] << fx) { |h|
+          h.each { |l|
+            ls = l.split
+            next unless ls[1] == "=>" and ls[2]
+            b = File.join ".", ls[2]
+            (du[b]||=[]) << f unless aggr.include? b
+          }
+        }
+      ensure
+        t.unlink if t
+      end
+    }
+
+    # dependencies by symlink resolution
+    lu = {}
+    (lnk & lastused[]).each { |f|
+      rf = File.join ".", resolve_in_root(f)
+      File.file? f or next
+      (lu[rf]||=[]) << f unless aggr.include? rf
+    }
+
+    au = {grep: gu, dyndep: du, symlink: lu}.reject { |k,v| v.empty? }
+    break if au.empty?
+    used << au
+    aggr += lastused[]
+  }
+
+  [
+    {
+      type:  {txt: txt.to_a, bin: bin.to_a, lnk: lnk.to_a},
+      usage: {used: used, unused: (files - aggr).to_a}
+    },
+    aggr
+  ]
+end
+
+def iputs x, i=0
+ case x
+ when Hash
+   x.each { |k,v|
+     iputs "#{k}:", i
+     iputs v, i+1
+   }
+   puts
+ when Array
+   x.each { |e| iputs e, i }
+   puts
+ else
+   puts "  "*i + x.to_s
+ end
+ nil
+end
+
+if __FILE__ == $0
+  require 'optparse'
+
+  fmt = "indented"
+  show = "dump"
+  root = "."
+  opts = { txt_grep:  false }
+  OptionParser.new { |op|
+    op.banner = "Find dependencies of given initial files heuristically.\n#{op.banner} init..."
+    op.on('-f', '--format=FMT', 'output in given format (indented,json,awesome)') { |f| fmt = f }
+    op.on('-s', '--show=CAT', 'show info of given category (dump,type,usage,bin-unused)') { |c|
+      show = c
+    }
+    op.on('-r', '--root=D', 'root of file tree') { |d| root = d }
+    op.on('-I', '--txt-grep', "don't grep on binary files (like `grep -I`)"){ opts[:txt_grep] = true }
+  }.parse!
+
+  stats, aggr_used = get_stats root, $*, opts
+
+  q = case show
+  when "type"
+    stats[:type]
+  when "usage"
+    stats[:usage]
+  when "dump"
+    stats
+  when /\Abin[-_]?unused\Z/
+    (Set.new(stats[:type][:bin]) - aggr_used).to_a
+  end
+
+  case fmt
+  when "indented"
+    iputs q
+  when "json"
+    require 'json'
+    $> << JSON.dump(q)
+  when "awesome"
+    require 'ap'
+    ap q
+  else
+    raise "unknown format #{fmt}"
+  end
+end
