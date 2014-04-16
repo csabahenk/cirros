@@ -1,0 +1,13 @@
+diff --git a/package/dropbear/S50dropbear b/package/dropbear/S50dropbear
+index a343b9e..dae4d56 100644
+--- a/package/dropbear/S50dropbear
++++ b/package/dropbear/S50dropbear
+@@ -14,7 +14,7 @@ start() {
+ 	if [ ! -d /etc/dropbear ] ; then
+ 		mkdir -p /etc/dropbear
+ 	fi
+-	umask 077
++	umask 022
+ 	start-stop-daemon -S -q -p /var/run/dropbear.pid \
+ 		--exec /usr/sbin/dropbear -- $DROPBEAR_ARGS
+ 	[ $? == 0 ] && echo "OK" || echo "FAIL"
