@@ -1,2 +1,3 @@
 nfs-utils-enable-nfsv4.patch
 dropbear-fix-path.patch
+dropbear-fix-default-fileperms.patch
